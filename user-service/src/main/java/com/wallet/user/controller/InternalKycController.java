@@ -2,6 +2,7 @@ package com.wallet.user.controller;
 
 import com.wallet.user.entity.KycDetails;
 import com.wallet.user.service.UserService;
+import io.swagger.v3.oas.annotations.Hidden;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -11,6 +12,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+// Internal admin-to-user-service APIs are kept out of Swagger while remaining callable.
+@Hidden
 @RestController
 @RequestMapping("/api/users/internal")
 public class InternalKycController {

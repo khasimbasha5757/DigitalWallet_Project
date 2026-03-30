@@ -29,6 +29,7 @@ public class InternalSecurityFilter implements Filter {
             return;
         }
 
+        // Transaction APIs are protected from direct access outside the gateway layer.
         String secretToken = httpRequest.getHeader(INTERNAL_SECRET_HEADER);
         logger.info("Access attempt to {} | Internal Token Present: {}", path, (secretToken != null));
 

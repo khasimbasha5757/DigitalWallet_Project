@@ -25,6 +25,7 @@ public class WalletController {
 
     @GetMapping("/balance")
     public ResponseEntity<Map<String, Object>> getBalance(@Parameter(hidden = true) @RequestHeader("Authorization") String token) {
+        // The authenticated userId comes from JWT claims, not from request parameters.
         String userId = jwtUtil.extractUserId(token);
         BigDecimal balance = walletService.getBalance(UUID.fromString(userId));
         return ResponseEntity.ok(Map.of("userId", userId, "balance", balance));

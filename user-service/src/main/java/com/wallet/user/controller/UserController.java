@@ -4,6 +4,7 @@ import com.wallet.user.dto.KycSubmitRequest;
 import com.wallet.user.entity.KycDetails;
 import com.wallet.user.service.UserService;
 import com.wallet.user.util.JwtUtil;
+import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Parameter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -25,7 +26,7 @@ public class UserController {
     public ResponseEntity<?> submitKyc(@Parameter(hidden = true) @RequestHeader("Authorization") String token,
             @jakarta.validation.Valid @RequestBody KycSubmitRequest request) {
         try {
-
+            // User identity is derived from JWT rather than trusting client-supplied IDs.
             UUID userId = UUID.fromString(jwtUtil.extractUserId(token));
             String email = jwtUtil.extractEmail(token);
             String role = jwtUtil.extractRole(token);
@@ -48,8 +49,10 @@ public class UserController {
     }
 
     // Internal endpoint for other services to get user details
+    @Hidden
     @GetMapping("/internal/{userId}")
     public ResponseEntity<?> getUserInternal(@PathVariable UUID userId) {
+        // Internal admin flows use this lightweight lookup to resolve user metadata such as email.
         return userService.findById(userId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());

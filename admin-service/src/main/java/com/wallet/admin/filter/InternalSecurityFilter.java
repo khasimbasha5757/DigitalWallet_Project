@@ -29,6 +29,7 @@ public class InternalSecurityFilter implements Filter {
             return;
         }
 
+        // Admin routes are also forced behind the gateway to keep a single controlled entry point.
         String secretToken = httpRequest.getHeader(INTERNAL_SECRET_HEADER);
         logger.info("Access attempt to {} | Internal Token Present: {}", path, (secretToken != null));
 

@@ -29,6 +29,7 @@ public class InternalSecurityFilter implements Filter {
             return;
         }
 
+        // This blocks direct service access and keeps external traffic flowing through the gateway.
         String secretToken = httpRequest.getHeader(INTERNAL_SECRET_HEADER);
         logger.info("Access attempt to {} | Internal Token Present: {}", path, (secretToken != null));
 

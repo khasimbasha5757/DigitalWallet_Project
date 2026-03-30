@@ -29,6 +29,7 @@ public class InternalSecurityFilter implements Filter {
             return;
         }
 
+        // Rewards endpoints trust requests only when they come through the internal gateway path.
         String secretToken = httpRequest.getHeader(INTERNAL_SECRET_HEADER);
         logger.info("Access attempt to {} | Internal Token Present: {}", path, (secretToken != null));
 

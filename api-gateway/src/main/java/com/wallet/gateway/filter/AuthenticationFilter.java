@@ -28,6 +28,7 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
             String path = exchange.getRequest().getURI().getPath();
             logger.info("Authentication Filter processing path: {}", path);
 
+            // Only protected routes are forced through JWT validation here.
             if (config.isAuthRequired(path)) {
                 logger.debug("Authentication required for path: {}", path);
 
@@ -49,6 +50,7 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
                 }
 
                 try {
+                    // The gateway validates the token once before the request is forwarded downstream.
                     jwtUtil.validateToken(authHeader);
                     logger.info("[GATEWAY] JWT Validation SUCCESS for path: {}", path);
                 } catch (Exception e) {

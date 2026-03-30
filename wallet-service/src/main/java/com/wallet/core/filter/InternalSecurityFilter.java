@@ -29,6 +29,7 @@ public class InternalSecurityFilter implements Filter {
             return;
         }
 
+        // Wallet APIs are intentionally hidden behind gateway routing and the internal shared secret.
         String secretToken = httpRequest.getHeader(INTERNAL_SECRET_HEADER);
         logger.info("Access attempt to {} | Internal Token Present: {}", path, (secretToken != null));
 

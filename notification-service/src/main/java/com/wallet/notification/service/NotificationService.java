@@ -64,7 +64,7 @@ public class NotificationService {
             
             logger.info("Triggering Real Email to={} Message={}", userEmail, message);
             
-            // 1. Send Real Email
+            // KYC mails are sent asynchronously after admin-service publishes the status event.
             emailService.sendEmail(userEmail, "KYC Status Update: " + status, message);
 
             NotificationHistory history = new NotificationHistory();

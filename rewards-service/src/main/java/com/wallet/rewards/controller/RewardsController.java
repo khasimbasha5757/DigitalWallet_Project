@@ -35,6 +35,7 @@ public class RewardsController {
 
     @PostMapping("/redeem/{catalogId}")
     public ResponseEntity<?> redeem(@Parameter(hidden = true) @RequestHeader("Authorization") String token, @PathVariable UUID catalogId) {
+        // Redemption is always tied to the authenticated user from the JWT.
         String userId = jwtUtil.extractUserId(token);
         try {
             return ResponseEntity.ok(rewardsService.redeemItem(UUID.fromString(userId), catalogId));

@@ -56,6 +56,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     if (role != null && !role.isBlank()) {
                         authorities.add(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()));
                     }
+                    // Downstream access control relies on userId as principal and role-based authorities.
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userId, null, authorities);
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

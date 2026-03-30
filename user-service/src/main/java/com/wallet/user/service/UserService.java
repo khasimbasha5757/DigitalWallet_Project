@@ -4,6 +4,7 @@ import com.wallet.user.dto.KycSubmitRequest;
 import com.wallet.user.entity.KycDetails;
 import com.wallet.user.repository.KycRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -23,6 +24,9 @@ public class UserService {
 
     @Autowired
     private RestTemplate restTemplate;
+
+    @Value("${gateway.base-url:http://localhost:8090}")
+    private String gatewayBaseUrl;
 
     public Optional<com.wallet.user.entity.User> findById(UUID userId) {
         return userRepository.findById(userId);
@@ -44,6 +48,7 @@ public class UserService {
         kyc.setDocumentNumber(request.getDocumentNumber());
         kyc.setDocumentUrl(request.getDocumentUrl());
         kyc.setStatus("PENDING");
+        // A user can resubmit until approval, but an approved KYC is treated as final here.
         kycRepository.save(kyc);
 
         return "KYC details submitted successfully and pending approval";
@@ -74,6 +79,7 @@ public class UserService {
         kycRepository.save(kyc);
         kycRepository.flush();
 
+        // Auth service is updated so login/profile flows reflect the latest compliance state.
         // Determine global status
         String newStatus = "PENDING_KYC";
         if ("APPROVED".equals(status)) {
@@ -84,7 +90,7 @@ public class UserService {
 
         // Notify Auth Service (Single Source of Truth)
         try {
-            String authServiceUrl = "http://localhost:8090/api/auth/internal/users/" + userId + "/status?status="
+            String authServiceUrl = gatewayBaseUrl + "/api/auth/internal/users/" + userId + "/status?status="
                     + newStatus;
             restTemplate.postForEntity(authServiceUrl, null, String.class);
             System.out.println("Synchronized status " + newStatus + " with Auth Service for UserID: " + userId);

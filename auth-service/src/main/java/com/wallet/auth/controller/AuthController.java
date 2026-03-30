@@ -14,6 +14,7 @@ import com.wallet.auth.dto.AuthRequest;
 import com.wallet.auth.dto.AuthResponse;
 import com.wallet.auth.dto.RegisterRequest;
 import com.wallet.auth.service.AuthService;
+import io.swagger.v3.oas.annotations.Hidden;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -56,6 +57,8 @@ public class AuthController {
         return "Token is valid";
     }
 
+    // This endpoint stays available for internal service coordination but is hidden from API docs.
+    @Hidden
     @PostMapping("/internal/users/{userId}/status")
     public ResponseEntity<String> updateStatus(@PathVariable java.util.UUID userId, @RequestParam String status) {
         service.updateUserStatus(userId, status);
@@ -64,6 +67,7 @@ public class AuthController {
 
     @GetMapping("/users/{userId}/profile")
     public ResponseEntity<?> getProfile(@PathVariable java.util.UUID userId, Authentication authentication) {
+        // Normal users are transparently pinned to their own profile; admins can inspect any user.
         java.util.UUID effectiveUserId = resolveEffectiveUserId(userId, authentication);
         logger.info("Accessing profile for requested userId: {} | effective userId: {}", userId, effectiveUserId);
         try {
@@ -78,6 +82,7 @@ public class AuthController {
     public ResponseEntity<?> updateProfile(@PathVariable java.util.UUID userId,
             @RequestBody java.util.Map<String, String> updates,
             Authentication authentication) {
+        // The same effective-user resolution is reused for profile updates.
         java.util.UUID effectiveUserId = resolveEffectiveUserId(userId, authentication);
         logger.info("Updating profile for requested userId: {} | effective userId: {}", userId, effectiveUserId);
         try {

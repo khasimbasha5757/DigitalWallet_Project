@@ -24,13 +24,13 @@ public class InternalSecurityFilter implements Filter {
         HttpServletResponse httpResponse = (HttpServletResponse) response;
         String path = httpRequest.getRequestURI();
 
-        // 1. Exclude Swagger/OpenAPI and Actuator paths from the security check
+        // Documentation and health endpoints stay directly reachable for tooling and monitoring.
         if (path.contains("/v3/api-docs") || path.contains("/swagger-ui") || path.contains("/webjars") || path.contains("/actuator")) {
             chain.doFilter(request, response);
             return;
         }
 
-        // 2. Validate the internal secret token for all other requests
+        // All business endpoints are expected to arrive through the gateway with the shared internal header.
         String secretToken = httpRequest.getHeader(INTERNAL_SECRET_HEADER);
         logger.info("Access attempt to {} | Internal Token Present: {}", path, (secretToken != null));
 

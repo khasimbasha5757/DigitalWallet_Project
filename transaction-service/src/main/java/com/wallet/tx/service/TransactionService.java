@@ -34,29 +34,7 @@ public class TransactionService {
     public void handleTopUp(Map<String, Object> event) {
         log.info("Received Top-Up Event: {}", event);
         try {
-            UUID userId = UUID.fromString(event.get("userId").toString());
-            BigDecimal amount = new BigDecimal(event.get("amount").toString());
-            UUID txId = UUID.fromString(event.get("transactionId").toString());
-            String method = event.get("paymentMethod") != null ? event.get("paymentMethod").toString() : "unknown";
-
-            Transaction tx = new Transaction();
-            tx.setId(txId);
-            tx.setToUserId(userId);
-            tx.setAmount(amount);
-            tx.setType("TOPUP");
-            tx.setStatus("COMPLETED");
-            tx.setReferenceNotes("Topup via " + method);
-            transactionRepository.saveAndFlush(tx);
-
-            LedgerEntry credit = new LedgerEntry();
-            credit.setAccountId(userId);
-            credit.setTransactionId(txId);
-            credit.setType("CREDIT");
-            credit.setAmount(amount);
-            credit.setDescription("Wallet Top-up");
-            ledgerEntryRepository.saveAndFlush(credit);
-            
-            log.info("Successfully processed top-up for user: {}", userId);
+            recordTopUp(event);
         } catch (Exception e) {
             log.error("Error processing top-up event: {}", event, e);
         }
@@ -67,41 +45,83 @@ public class TransactionService {
     public void handleTransfer(Map<String, Object> event) {
         log.info("Received Transfer Event: {}", event);
         try {
-            UUID fromUserId = UUID.fromString(event.get("fromUserId").toString());
-            UUID toUserId = UUID.fromString(event.get("toUserId").toString());
-            BigDecimal amount = new BigDecimal(event.get("amount").toString());
-            UUID txId = UUID.fromString(event.get("transactionId").toString());
-            String notes = event.get("notes") != null ? event.get("notes").toString() : "";
-
-            Transaction tx = new Transaction();
-            tx.setId(txId);
-            tx.setFromUserId(fromUserId);
-            tx.setToUserId(toUserId);
-            tx.setAmount(amount);
-            tx.setType("TRANSFER");
-            tx.setStatus("COMPLETED");
-            tx.setReferenceNotes(notes);
-            transactionRepository.saveAndFlush(tx);
-
-            LedgerEntry debit = new LedgerEntry();
-            debit.setAccountId(fromUserId);
-            debit.setTransactionId(txId);
-            debit.setType("DEBIT");
-            debit.setAmount(amount);
-            debit.setDescription("Transfer to " + toUserId);
-            ledgerEntryRepository.saveAndFlush(debit);
-
-            LedgerEntry credit = new LedgerEntry();
-            credit.setAccountId(toUserId);
-            credit.setTransactionId(txId);
-            credit.setType("CREDIT");
-            credit.setAmount(amount);
-            credit.setDescription("Transfer from " + fromUserId);
-            ledgerEntryRepository.saveAndFlush(credit);
-            
-            log.info("Successfully processed transfer from {} to {}", fromUserId, toUserId);
+            recordTransfer(event);
         } catch (Exception e) {
             log.error("Error processing transfer event: {}", event, e);
         }
+    }
+
+    @Transactional
+    public void recordTopUp(Map<String, Object> event) {
+        UUID userId = UUID.fromString(event.get("userId").toString());
+        BigDecimal amount = new BigDecimal(event.get("amount").toString());
+        UUID txId = UUID.fromString(event.get("transactionId").toString());
+        String method = event.get("paymentMethod") != null ? event.get("paymentMethod").toString() : "unknown";
+
+        if (transactionRepository.existsById(txId)) {
+            log.info("Skipping duplicate top-up transaction {}", txId);
+            return;
+        }
+
+        Transaction tx = new Transaction();
+        tx.setId(txId);
+        tx.setToUserId(userId);
+        tx.setAmount(amount);
+        tx.setType("TOPUP");
+        tx.setStatus("COMPLETED");
+        tx.setReferenceNotes("Topup via " + method);
+        transactionRepository.saveAndFlush(tx);
+
+        LedgerEntry credit = new LedgerEntry();
+        credit.setAccountId(userId);
+        credit.setTransactionId(txId);
+        credit.setType("CREDIT");
+        credit.setAmount(amount);
+        credit.setDescription("Wallet Top-up");
+        ledgerEntryRepository.saveAndFlush(credit);
+
+        log.info("Successfully processed top-up for user: {}", userId);
+    }
+
+    @Transactional
+    public void recordTransfer(Map<String, Object> event) {
+        UUID fromUserId = UUID.fromString(event.get("fromUserId").toString());
+        UUID toUserId = UUID.fromString(event.get("toUserId").toString());
+        BigDecimal amount = new BigDecimal(event.get("amount").toString());
+        UUID txId = UUID.fromString(event.get("transactionId").toString());
+        String notes = event.get("notes") != null ? event.get("notes").toString() : "";
+
+        if (transactionRepository.existsById(txId)) {
+            log.info("Skipping duplicate transfer transaction {}", txId);
+            return;
+        }
+
+        Transaction tx = new Transaction();
+        tx.setId(txId);
+        tx.setFromUserId(fromUserId);
+        tx.setToUserId(toUserId);
+        tx.setAmount(amount);
+        tx.setType("TRANSFER");
+        tx.setStatus("COMPLETED");
+        tx.setReferenceNotes(notes);
+        transactionRepository.saveAndFlush(tx);
+
+        LedgerEntry debit = new LedgerEntry();
+        debit.setAccountId(fromUserId);
+        debit.setTransactionId(txId);
+        debit.setType("DEBIT");
+        debit.setAmount(amount);
+        debit.setDescription("Transfer to " + toUserId);
+        ledgerEntryRepository.saveAndFlush(debit);
+
+        LedgerEntry credit = new LedgerEntry();
+        credit.setAccountId(toUserId);
+        credit.setTransactionId(txId);
+        credit.setType("CREDIT");
+        credit.setAmount(amount);
+        credit.setDescription("Transfer from " + fromUserId);
+        ledgerEntryRepository.saveAndFlush(credit);
+
+        log.info("Successfully processed transfer from {} to {}", fromUserId, toUserId);
     }
 }

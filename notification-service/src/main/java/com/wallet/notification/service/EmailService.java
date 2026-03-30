@@ -17,6 +17,7 @@ public class EmailService {
 
     public void sendEmail(String to, String subject, String body) {
         try {
+            // JavaMailSender is backed by the SMTP properties configured for the service.
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom("no-reply@digitalwallet.com");
             message.setTo(to);

@@ -9,4 +9,5 @@ import java.util.UUID;
 
 public interface TransactionRepository extends JpaRepository<Transaction, UUID> {
     Page<Transaction> findByFromUserIdOrToUserIdOrderByTimestampDesc(UUID fromUserId, UUID toUserId, Pageable pageable);
+    boolean existsById(UUID id);
 }

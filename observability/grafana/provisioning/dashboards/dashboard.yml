@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: Digital Wallet Dashboards
+    orgId: 1
+    folder: Digital Wallet
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

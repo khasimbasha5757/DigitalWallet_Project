@@ -41,6 +41,7 @@ public class AuthService {
         credential.setFullName(request.getFullName());
         credential.setPhoneNumber(request.getPhoneNumber());
         
+        // Auth service is the source of truth for identity and account status.
         repository.saveAndFlush(credential);
 
         return "User registration successful";
@@ -54,6 +55,7 @@ public class AuthService {
             throw new RuntimeException("Invalid credentials");
         }
         
+        // The JWT carries the core identity fields needed by downstream services.
         String token = jwtUtil.generateToken(user.getEmail(), user.getRole(), user.getId().toString(), user.getFullName(), user.getPhoneNumber());
         return new AuthResponse(token, user.getId().toString(), user.getEmail(), user.getRole(), user.getFullName(), user.getPhoneNumber());
     }
