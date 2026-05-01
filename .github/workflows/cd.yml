@@ -124,6 +124,6 @@ jobs:
           docker build \
             --tag "${IMAGE}:${SHORT_SHA}" \
             --tag "${IMAGE}:latest" \
-            ./frontend
+            .
           docker push "${IMAGE}:${SHORT_SHA}"
           docker push "${IMAGE}:latest"
