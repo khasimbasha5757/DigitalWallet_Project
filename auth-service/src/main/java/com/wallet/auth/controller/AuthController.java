@@ -12,7 +12,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.wallet.auth.dto.AuthRequest;
 import com.wallet.auth.dto.AuthResponse;
+import com.wallet.auth.dto.ChangePasswordRequest;
+import com.wallet.auth.dto.ForgotPasswordRequest;
 import com.wallet.auth.dto.RegisterRequest;
+import com.wallet.auth.dto.ResetPasswordRequest;
+import com.wallet.auth.dto.VerifyOtpRequest;
 import com.wallet.auth.service.AuthService;
 import io.swagger.v3.oas.annotations.Hidden;
 
@@ -47,7 +51,40 @@ public class AuthController {
             AuthResponse response = service.login(request);
             return ResponseEntity.ok(response);
         } catch(Exception e){
+            logger.error("Login failed for identifier {}: {}", request.getUsername(), e.getMessage(), e);
             return ResponseEntity.status(401).body("Invalid Authentication");
+        }
+    }
+
+    @PostMapping("/forgot-password/request-otp")
+    public ResponseEntity<?> requestForgotPasswordOtp(@jakarta.validation.Valid @RequestBody ForgotPasswordRequest request) {
+        try {
+            return ResponseEntity.ok(service.requestPasswordResetOtp(request));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/forgot-password/account-exists")
+    public ResponseEntity<java.util.Map<String, Boolean>> forgotPasswordAccountExists(@RequestParam String identifier) {
+        return ResponseEntity.ok(java.util.Map.of("exists", service.accountExists(identifier)));
+    }
+
+    @PostMapping("/forgot-password/verify-otp")
+    public ResponseEntity<?> verifyForgotPasswordOtp(@jakarta.validation.Valid @RequestBody VerifyOtpRequest request) {
+        try {
+            return ResponseEntity.ok(service.verifyPasswordResetOtp(request));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/forgot-password/reset")
+    public ResponseEntity<?> resetPassword(@jakarta.validation.Valid @RequestBody ResetPasswordRequest request) {
+        try {
+            return ResponseEntity.ok(service.resetPassword(request));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
@@ -63,6 +100,12 @@ public class AuthController {
     public ResponseEntity<String> updateStatus(@PathVariable java.util.UUID userId, @RequestParam String status) {
         service.updateUserStatus(userId, status);
         return ResponseEntity.ok("User status updated to " + status);
+    }
+
+    @Hidden
+    @GetMapping("/internal/users/{userId}/role")
+    public ResponseEntity<java.util.Map<String, String>> getUserRole(@PathVariable java.util.UUID userId) {
+        return ResponseEntity.ok(java.util.Map.of("role", service.getUserRole(userId)));
     }
 
     @GetMapping("/users/{userId}/profile")
@@ -90,6 +133,20 @@ public class AuthController {
         } catch (Exception e) {
             logger.error("Error updating profile for userId {}: {}", effectiveUserId, e.getMessage());
             return ResponseEntity.status(404).body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/users/{userId}/change-password")
+    public ResponseEntity<?> changePassword(@PathVariable java.util.UUID userId,
+            @jakarta.validation.Valid @RequestBody ChangePasswordRequest request,
+            Authentication authentication) {
+        java.util.UUID effectiveUserId = resolveEffectiveUserId(userId, authentication);
+        logger.info("Changing password for requested userId: {} | effective userId: {}", userId, effectiveUserId);
+        try {
+            return ResponseEntity.ok(service.changePassword(effectiveUserId, request));
+        } catch (Exception e) {
+            logger.error("Error changing password for userId {}: {}", effectiveUserId, e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 

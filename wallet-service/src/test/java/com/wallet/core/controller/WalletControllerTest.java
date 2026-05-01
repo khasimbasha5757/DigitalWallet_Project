@@ -42,7 +42,7 @@ public class WalletControllerTest {
     void getBalance_Success() throws Exception {
         UUID userId = UUID.randomUUID();
         when(jwtUtil.extractUserId(anyString())).thenReturn(userId.toString());
-        when(walletService.getBalance(userId)).thenReturn(new BigDecimal("100.00"));
+        when(walletService.getBalance(eq(userId), anyString())).thenReturn(new BigDecimal("100.00"));
 
         mockMvc.perform(get("/api/wallet/balance")
                 .header("Authorization", "Bearer testToken"))
@@ -56,7 +56,7 @@ public class WalletControllerTest {
         TopUpRequest request = new TopUpRequest(userId, new BigDecimal("50.00"), "UPI");
         
         when(jwtUtil.extractUserId(anyString())).thenReturn(userId.toString());
-        when(walletService.topUp(eq(userId), any())).thenReturn("Top-up successful");
+        when(walletService.topUp(eq(userId), any(), anyString())).thenReturn("Top-up successful");
 
         mockMvc.perform(post("/api/wallet/topup")
                 .header("Authorization", "Bearer testToken")
@@ -73,7 +73,7 @@ public class WalletControllerTest {
         TransferRequest request = new TransferRequest(toUserId, new BigDecimal("40.00"), "Rent");
         
         when(jwtUtil.extractUserId(anyString())).thenReturn(fromUserId.toString());
-        when(walletService.transfer(eq(fromUserId), any())).thenReturn("Transfer successful");
+        when(walletService.transfer(eq(fromUserId), any(), anyString())).thenReturn("Transfer successful");
 
         mockMvc.perform(post("/api/wallet/transfer")
                 .header("Authorization", "Bearer testToken")
@@ -89,7 +89,7 @@ public class WalletControllerTest {
         TransferRequest request = new TransferRequest(UUID.randomUUID(), new BigDecimal("1000.00"), "Rent");
         
         when(jwtUtil.extractUserId(anyString())).thenReturn(userId.toString());
-        when(walletService.transfer(any(), any())).thenThrow(new RuntimeException("Insufficient funds"));
+        when(walletService.transfer(any(), any(), anyString())).thenThrow(new RuntimeException("Insufficient funds"));
 
         mockMvc.perform(post("/api/wallet/transfer")
                 .header("Authorization", "Bearer testToken")
@@ -97,5 +97,18 @@ public class WalletControllerTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string("Insufficient funds"));
+    }
+
+    @Test
+    void getBalance_KycNotSubmitted_ReturnsBadRequest() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(jwtUtil.extractUserId(anyString())).thenReturn(userId.toString());
+        when(walletService.getBalance(eq(userId), anyString()))
+                .thenThrow(new RuntimeException("Complete your KYC submission before using wallet services."));
+
+        mockMvc.perform(get("/api/wallet/balance")
+                .header("Authorization", "Bearer testToken"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Complete your KYC submission before using wallet services."));
     }
 }

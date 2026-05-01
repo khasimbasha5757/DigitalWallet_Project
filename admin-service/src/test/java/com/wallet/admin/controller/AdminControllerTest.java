@@ -75,9 +75,20 @@ public class AdminControllerTest {
                 .thenReturn(new ResponseEntity<>(Map.of("email", "user@gmail.com", "status", "APPROVED"), HttpStatus.OK));
 
         mockMvc.perform(post("/api/admin/kyc/" + userId + "/approve")
-                .header("Authorization", token))
+                .header("Authorization", token)
+                .param("documentReviewed", "true"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("KYC Approved")));
+    }
+
+    @Test
+    void approveKyc_RequiresDocumentReview() throws Exception {
+        UUID userId = UUID.randomUUID();
+
+        mockMvc.perform(post("/api/admin/kyc/" + userId + "/approve")
+                .header("Authorization", "Bearer testToken"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Admin must review")));
     }
 
     @Test
@@ -102,10 +113,11 @@ public class AdminControllerTest {
         when(restTemplate.postForEntity(any(String.class), any(HttpEntity.class), eq(java.util.Map.class)))
                 .thenReturn(new ResponseEntity<>(Map.of("status", "APPROVED"), HttpStatus.OK));
         when(restTemplate.exchange(any(String.class), eq(org.springframework.http.HttpMethod.GET), any(HttpEntity.class), eq(java.util.Map.class)))
-                .thenReturn(new ResponseEntity<>(Map.of("email", "user-" + userId + "@example.com"), HttpStatus.OK));
+                .thenReturn(new ResponseEntity<>(Map.of("email", "invalid-email"), HttpStatus.OK));
 
         mockMvc.perform(post("/api/admin/kyc/" + userId + "/approve")
-                .header("Authorization", "Bearer testToken"))
+                .header("Authorization", "Bearer testToken")
+                .param("documentReviewed", "true"))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Unable to resolve a valid email address")));
     }

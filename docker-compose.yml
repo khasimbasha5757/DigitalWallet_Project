@@ -74,6 +74,7 @@ services:
         SERVICE_MODULE: config-server
     environment:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      CONFIG_REPO_URI: file:/app/config-repo
       ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
     ports:
       - "8888:8888"
@@ -89,10 +90,12 @@ services:
         SERVICE_MODULE: auth-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/digital_wallet_auth
+      SPRING_CONFIG_IMPORT: configserver:http://config-server:8888
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: root
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       SPRINGDOC_SERVER_URL: http://localhost:8090
+      NOTIFICATION_INTERNAL_EMAIL_URL: http://notification-service:8086/api/notifications/internal/email
       ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
     ports:
       - "8081:8081"
@@ -100,6 +103,8 @@ services:
       postgres:
         condition: service_healthy
       eureka-server:
+        condition: service_started
+      config-server:
         condition: service_started
     restart: unless-stopped
 
@@ -111,6 +116,7 @@ services:
         SERVICE_MODULE: user-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/digital_wallet_user
+      SPRING_CONFIG_IMPORT: configserver:http://config-server:8888
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: root
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
@@ -124,6 +130,8 @@ services:
         condition: service_healthy
       eureka-server:
         condition: service_started
+      config-server:
+        condition: service_started
       api-gateway:
         condition: service_started
     restart: unless-stopped
@@ -136,6 +144,7 @@ services:
         SERVICE_MODULE: transaction-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/digital_wallet_tx
+      SPRING_CONFIG_IMPORT: configserver:http://config-server:8888
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: root
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -151,6 +160,8 @@ services:
         condition: service_started
       eureka-server:
         condition: service_started
+      config-server:
+        condition: service_started
     restart: unless-stopped
 
   rewards-service:
@@ -161,11 +172,15 @@ services:
         SERVICE_MODULE: rewards-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/digital_wallet_rewards
+      SPRING_CONFIG_IMPORT: configserver:http://config-server:8888
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: root
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       SPRINGDOC_SERVER_URL: http://localhost:8090
+      WALLET_INTERNAL_BASE_URL: http://wallet-service:8083/api/wallet/internal
+      NOTIFICATION_INTERNAL_BASE_URL: http://notification-service:8086/api/notifications/internal
+      ADMIN_INTERNAL_BASE_URL: http://admin-service:8087/api/admin
       ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
     ports:
       - "8085:8085"
@@ -175,6 +190,8 @@ services:
       kafka:
         condition: service_started
       eureka-server:
+        condition: service_started
+      config-server:
         condition: service_started
     restart: unless-stopped
 
@@ -186,6 +203,7 @@ services:
         SERVICE_MODULE: notification-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/digital_wallet_notification
+      SPRING_CONFIG_IMPORT: configserver:http://config-server:8888
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: root
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -201,6 +219,8 @@ services:
         condition: service_started
       eureka-server:
         condition: service_started
+      config-server:
+        condition: service_started
     restart: unless-stopped
 
   admin-service:
@@ -211,6 +231,7 @@ services:
         SERVICE_MODULE: admin-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/digital_wallet_user
+      SPRING_CONFIG_IMPORT: configserver:http://config-server:8888
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: root
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -227,6 +248,8 @@ services:
         condition: service_started
       eureka-server:
         condition: service_started
+      config-server:
+        condition: service_started
       api-gateway:
         condition: service_started
     restart: unless-stopped
@@ -239,12 +262,15 @@ services:
         SERVICE_MODULE: wallet-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/digital_wallet_wallet
+      SPRING_CONFIG_IMPORT: configserver:http://config-server:8888
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: root
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SPRING_DATA_REDIS_HOST: redis
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       SPRINGDOC_SERVER_URL: http://localhost:8090
+      GATEWAY_BASE_URL: http://api-gateway:8090/api
+      AUTH_INTERNAL_BASE_URL: http://auth-service:8081/api/auth/internal
       TX_INTERNAL_BASE_URL: http://transaction-service:8084/api/transactions/internal
       REWARDS_INTERNAL_BASE_URL: http://rewards-service:8085/api/rewards/internal
       ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
@@ -263,6 +289,8 @@ services:
         condition: service_started
       eureka-server:
         condition: service_started
+      config-server:
+        condition: service_started
     restart: unless-stopped
 
   api-gateway:
@@ -273,11 +301,13 @@ services:
         SERVICE_MODULE: api-gateway
     environment:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SPRING_CONFIG_IMPORT: configserver:http://config-server:8888
       ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
     ports:
       - "8090:8090"
     depends_on:
       - eureka-server
+      - config-server
     restart: unless-stopped
 
   zipkin:

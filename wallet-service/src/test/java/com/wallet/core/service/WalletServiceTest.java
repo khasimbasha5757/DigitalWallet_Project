@@ -4,6 +4,7 @@ import com.wallet.core.dto.TopUpRequest;
 import com.wallet.core.dto.TransferRequest;
 import com.wallet.core.entity.WalletAccount;
 import com.wallet.core.repository.WalletAccountRepository;
+import com.wallet.core.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,9 +13,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -37,6 +42,12 @@ public class WalletServiceTest {
     @Mock
     private KafkaTemplate<String, Object> kafkaTemplate;
 
+    @Mock
+    private RestTemplate restTemplate;
+
+    @Mock
+    private JwtUtil jwtUtil;
+
     @InjectMocks
     private WalletService walletService;
 
@@ -52,13 +63,18 @@ public class WalletServiceTest {
         walletAccount.setStatus("ACTIVE");
 
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        lenient().when(jwtUtil.extractRole(anyString())).thenReturn("USER");
+        lenient().when(restTemplate.postForEntity(anyString(), any(), eq(String.class)))
+                .thenReturn(ResponseEntity.ok("ok"));
+        lenient().when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(Map.class)))
+                .thenReturn(ResponseEntity.ok(Map.of("status", "APPROVED")));
     }
 
     @Test
     void getBalance_FromRedis() {
         when(valueOperations.get(anyString())).thenReturn("150.00");
 
-        BigDecimal balance = walletService.getBalance(userId);
+        BigDecimal balance = walletService.getBalance(userId, "Bearer testToken");
 
         assertEquals(new BigDecimal("150.00"), balance);
         verify(repository, never()).findByUserId(any());
@@ -69,7 +85,7 @@ public class WalletServiceTest {
         when(valueOperations.get(anyString())).thenReturn(null);
         when(repository.findByUserId(userId)).thenReturn(Optional.of(walletAccount));
 
-        BigDecimal balance = walletService.getBalance(userId);
+        BigDecimal balance = walletService.getBalance(userId, "Bearer testToken");
 
         assertEquals(new BigDecimal("100.00"), balance);
         verify(valueOperations, times(1)).set(anyString(), anyString());
@@ -80,7 +96,7 @@ public class WalletServiceTest {
         TopUpRequest request = new TopUpRequest(userId, new BigDecimal("50.00"), "UPI");
         when(repository.findByUserId(userId)).thenReturn(Optional.of(walletAccount));
 
-        String result = walletService.topUp(userId, request);
+        String result = walletService.topUp(userId, request, "Bearer testToken");
 
         assertEquals("Top-up successful. Balance updated.", result);
         assertEquals(new BigDecimal("150.00"), walletAccount.getCachedBalance());
@@ -100,7 +116,7 @@ public class WalletServiceTest {
         when(repository.findByUserId(userId)).thenReturn(Optional.of(walletAccount));
         when(repository.findByUserId(targetUserId)).thenReturn(Optional.of(targetAccount));
 
-        String result = walletService.transfer(userId, request);
+        String result = walletService.transfer(userId, request, "Bearer testToken");
 
         assertEquals("Transfer successful.", result);
         assertEquals(new BigDecimal("60.00"), walletAccount.getCachedBalance());
@@ -116,12 +132,69 @@ public class WalletServiceTest {
         
         when(repository.findByUserId(userId)).thenReturn(Optional.of(walletAccount));
 
-        assertThrows(RuntimeException.class, () -> walletService.transfer(userId, request));
+        assertThrows(RuntimeException.class, () -> walletService.transfer(userId, request, "Bearer testToken"));
     }
 
     @Test
     void transfer_ToSelf() {
         TransferRequest request = new TransferRequest(userId, new BigDecimal("10.00"), "Self");
-        assertThrows(RuntimeException.class, () -> walletService.transfer(userId, request));
+        assertThrows(RuntimeException.class, () -> walletService.transfer(userId, request, "Bearer testToken"));
+    }
+
+    @Test
+    void getBalance_KycNotSubmitted() {
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(Map.class)))
+                .thenThrow(new RuntimeException("Complete your KYC submission before using wallet services."));
+
+        RuntimeException exception = assertThrows(
+                RuntimeException.class,
+                () -> walletService.getBalance(userId, "Bearer testToken")
+        );
+
+        assertEquals("Complete your KYC submission before using wallet services.", exception.getMessage());
+        verify(repository, never()).findByUserId(any());
+    }
+
+    @Test
+    void getBalance_KycPendingApproval() {
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(Map.class)))
+                .thenReturn(ResponseEntity.ok(Map.of("status", "PENDING")));
+
+        RuntimeException exception = assertThrows(
+                RuntimeException.class,
+                () -> walletService.getBalance(userId, "Bearer testToken")
+        );
+
+        assertEquals("Your KYC is still pending approval. Wallet services unlock only after approval.", exception.getMessage());
+        verify(repository, never()).findByUserId(any());
+    }
+
+    @Test
+    void getBalance_AdminRoleBlocked() {
+        when(jwtUtil.extractRole(anyString())).thenReturn("ADMIN");
+
+        RuntimeException exception = assertThrows(
+                RuntimeException.class,
+                () -> walletService.getBalance(userId, "Bearer adminToken")
+        );
+
+        assertEquals("Admin accounts cannot use wallet balance, top-up, or transfer services.", exception.getMessage());
+        verify(repository, never()).findByUserId(any());
+    }
+
+    @Test
+    void transfer_ToAdminRecipientBlocked() {
+        UUID targetUserId = UUID.randomUUID();
+        TransferRequest request = new TransferRequest(targetUserId, new BigDecimal("40.00"), "Dinner");
+        when(restTemplate.exchange(contains("/role"), eq(HttpMethod.GET), any(), eq(Map.class)))
+                .thenReturn(ResponseEntity.ok(Map.of("role", "ADMIN")));
+
+        RuntimeException exception = assertThrows(
+                RuntimeException.class,
+                () -> walletService.transfer(userId, request, "Bearer testToken")
+        );
+
+        assertEquals("Transfers to admin accounts are not allowed.", exception.getMessage());
+        verify(repository, never()).findByUserId(any());
     }
 }

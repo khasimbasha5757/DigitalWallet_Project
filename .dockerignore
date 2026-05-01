@@ -1,4 +1,12 @@
 **/target
+.metadata
+.metadata/
+.sonarlint
+.sonarlint/
+tmp_pdf
+tmp_pdf/
+frontend/node_modules
+frontend/dist
 **/.idea
 **/.settings
 **/.classpath

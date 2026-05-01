@@ -2,11 +2,14 @@ package com.wallet.notification.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.UUID;
 
 @Entity
 @Table(name = "notification_history")
 public class NotificationHistory {
+
+    private static final ZoneId IST_ZONE = ZoneId.of("Asia/Kolkata");
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -19,7 +22,7 @@ public class NotificationHistory {
     @Column(length = 1000)
     private String message;
 
-    private LocalDateTime sentAt = LocalDateTime.now();
+    private LocalDateTime sentAt = LocalDateTime.now(IST_ZONE);
     
     // In real app: EMAIL, SMS, PUSH
     private String type = "EMAIL";
@@ -47,4 +50,11 @@ public class NotificationHistory {
     public void setSentAt(LocalDateTime sentAt) { this.sentAt = sentAt; }
     public String getType() { return type; }
     public void setType(String type) { this.type = type; }
+
+    @PrePersist
+    public void ensureSentAtInIst() {
+        if (sentAt == null) {
+            sentAt = LocalDateTime.now(IST_ZONE);
+        }
+    }
 }

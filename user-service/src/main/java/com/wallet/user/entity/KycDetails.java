@@ -17,6 +17,8 @@ public class KycDetails {
 
     private String documentType; // PASSPORT, NATIONAL_ID
     private String documentNumber;
+
+    @Column(length = 1024)
     private String documentUrl;
     
     private String status; // PENDING, APPROVED, REJECTED

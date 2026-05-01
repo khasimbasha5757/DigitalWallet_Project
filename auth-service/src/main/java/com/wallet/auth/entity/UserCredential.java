@@ -32,8 +32,20 @@ public class UserCredential {
     @Column(nullable = true)
     private String phoneNumber;
 
+    @Column(nullable = true, columnDefinition = "TEXT")
+    private String profileImageUrl;
+
     @Column(nullable = false)
     private java.time.LocalDateTime createdAt = java.time.LocalDateTime.now();
+
+    @Column(nullable = true, length = 10)
+    private String passwordResetOtp;
+
+    @Column(nullable = true)
+    private java.time.LocalDateTime passwordResetOtpExpiresAt;
+
+    @Column(nullable = false)
+    private boolean passwordResetOtpVerified = false;
 
     public UserCredential() {}
 
@@ -64,6 +76,14 @@ public class UserCredential {
     public void setFullName(String fullName) { this.fullName = fullName; }
     public String getPhoneNumber() { return phoneNumber; }
     public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
+    public String getProfileImageUrl() { return profileImageUrl; }
+    public void setProfileImageUrl(String profileImageUrl) { this.profileImageUrl = profileImageUrl; }
     public java.time.LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(java.time.LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public String getPasswordResetOtp() { return passwordResetOtp; }
+    public void setPasswordResetOtp(String passwordResetOtp) { this.passwordResetOtp = passwordResetOtp; }
+    public java.time.LocalDateTime getPasswordResetOtpExpiresAt() { return passwordResetOtpExpiresAt; }
+    public void setPasswordResetOtpExpiresAt(java.time.LocalDateTime passwordResetOtpExpiresAt) { this.passwordResetOtpExpiresAt = passwordResetOtpExpiresAt; }
+    public boolean isPasswordResetOtpVerified() { return passwordResetOtpVerified; }
+    public void setPasswordResetOtpVerified(boolean passwordResetOtpVerified) { this.passwordResetOtpVerified = passwordResetOtpVerified; }
 }

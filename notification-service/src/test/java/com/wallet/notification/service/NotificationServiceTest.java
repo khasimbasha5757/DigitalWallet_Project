@@ -1,5 +1,6 @@
 package com.wallet.notification.service;
 
+import com.wallet.common.dto.KycNotificationEvent;
 import com.wallet.notification.entity.NotificationHistory;
 import com.wallet.notification.repository.NotificationRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +22,9 @@ public class NotificationServiceTest {
 
     @Mock
     private NotificationRepository notificationRepository;
+
+    @Mock
+    private EmailService emailService;
 
     @InjectMocks
     private NotificationService notificationService;
@@ -65,6 +69,54 @@ public class NotificationServiceTest {
         event.put("amount", "100.00");
 
         notificationService.handleTopUp(event);
+
+        verify(notificationRepository, never()).save(any());
+    }
+
+    @Test
+    void handleKycStatusUpdate_Approved_SendsEmailAndStoresHistory() {
+        KycNotificationEvent event = new KycNotificationEvent(userId, "user@example.com", "APPROVED",
+                "Identity verification successful", "KYC_UPDATE");
+
+        notificationService.handleKycStatusUpdate(event);
+
+        verify(emailService).sendEmail("user@example.com", "KYC Status Update: APPROVED",
+                "Your KYC status has been updated to: APPROVED. You can now perform full transactions.");
+        verify(notificationRepository).save(any(NotificationHistory.class));
+    }
+
+    @Test
+    void handleKycStatusUpdate_Rejected_UsesReasonInMessage() {
+        KycNotificationEvent event = new KycNotificationEvent(userId, "user@example.com", "REJECTED",
+                "Documents unclear", "KYC_UPDATE");
+
+        notificationService.handleKycStatusUpdate(event);
+
+        verify(emailService).sendEmail("user@example.com", "KYC Status Update: REJECTED",
+                "Your KYC status has been updated to: REJECTED. Reason: Documents unclear");
+        verify(notificationRepository).save(any(NotificationHistory.class));
+    }
+
+    @Test
+    void handleKycStatusUpdate_EmailFailureIsRethrown() {
+        KycNotificationEvent event = new KycNotificationEvent(userId, "user@example.com", "APPROVED",
+                "Identity verification successful", "KYC_UPDATE");
+        doThrow(new RuntimeException("Email delivery failed")).when(emailService)
+                .sendEmail(any(), any(), any());
+
+        org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class,
+                () -> notificationService.handleKycStatusUpdate(event));
+
+        verify(notificationRepository, never()).save(any(NotificationHistory.class));
+    }
+
+    @Test
+    void handleTransfer_Exception_Logged() {
+        Map<String, Object> event = new HashMap<>();
+        event.put("fromUserId", userId);
+        event.put("amount", "50.00");
+
+        notificationService.handleTransfer(event);
 
         verify(notificationRepository, never()).save(any());
     }

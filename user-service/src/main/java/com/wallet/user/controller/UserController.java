@@ -7,9 +7,15 @@ import com.wallet.user.util.JwtUtil;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Parameter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.Path;
 import java.util.UUID;
 
 @RestController
@@ -22,14 +28,20 @@ public class UserController {
     @Autowired
     private JwtUtil jwtUtil;
 
-    @PostMapping("/kyc")
+    @Value("${kyc.upload-dir:uploads/kyc}")
+    private String kycUploadDir;
+
+    @PostMapping(value = "/kyc", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> submitKyc(@Parameter(hidden = true) @RequestHeader("Authorization") String token,
-            @jakarta.validation.Valid @RequestBody KycSubmitRequest request) {
+            @RequestParam String documentType,
+            @RequestParam String documentNumber,
+            @RequestParam("documentFile") MultipartFile documentFile) {
         try {
             // User identity is derived from JWT rather than trusting client-supplied IDs.
             UUID userId = UUID.fromString(jwtUtil.extractUserId(token));
             String email = jwtUtil.extractEmail(token);
             String role = jwtUtil.extractRole(token);
+            KycSubmitRequest request = userService.buildKycRequest(documentType, documentNumber, documentFile);
             return ResponseEntity.ok(userService.submitKyc(userId, email, role, request));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body("Validation Error: " + e.getMessage());
@@ -46,6 +58,28 @@ public class UserController {
         String email = jwtUtil.extractEmail(token);
         String role = jwtUtil.extractRole(token);
         return ResponseEntity.ok(userService.getKycStatus(userId, email, role));
+    }
+
+    @GetMapping(value = "/kyc/documents/{fileName}", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<Resource> getKycDocument(@PathVariable String fileName) {
+        try {
+            Path uploadRoot = Path.of(kycUploadDir).toAbsolutePath().normalize();
+            Path documentPath = uploadRoot.resolve(fileName).normalize();
+            if (!documentPath.startsWith(uploadRoot) || !fileName.toLowerCase().endsWith(".pdf")) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            Resource resource = new UrlResource(documentPath.toUri());
+            if (!resource.exists() || !resource.isReadable()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(resource);
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     // Internal endpoint for other services to get user details

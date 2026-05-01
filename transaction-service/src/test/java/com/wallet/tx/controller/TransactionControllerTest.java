@@ -3,6 +3,7 @@ package com.wallet.tx.controller;
 import com.wallet.tx.entity.Transaction;
 import com.wallet.tx.repository.LedgerEntryRepository;
 import com.wallet.tx.repository.TransactionRepository;
+import com.wallet.tx.util.JwtUtil;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -37,6 +38,9 @@ public class TransactionControllerTest {
     @MockBean
     private LedgerEntryRepository ledgerEntryRepository;
 
+    @MockBean
+    private JwtUtil jwtUtil;
+
     @Test
     void getHistory_Success() throws Exception {
         UUID userId = UUID.randomUUID();
@@ -64,6 +68,39 @@ public class TransactionControllerTest {
         mockMvc.perform(get("/api/transactions/ledger-balance/" + userId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ledgerBalance").value(150.00))
+                .andExpect(jsonPath("$.userId").value(userId.toString()));
+    }
+
+    @Test
+    void getMyHistory_UsesJwtUserId() throws Exception {
+        UUID userId = UUID.randomUUID();
+        Transaction tx = new Transaction();
+        tx.setId(UUID.randomUUID());
+        tx.setFromUserId(userId);
+        tx.setAmount(new BigDecimal("75.00"));
+        tx.setType("TRANSFER");
+
+        Page<Transaction> page = new PageImpl<>(List.of(tx), PageRequest.of(0, 20), 1);
+        when(jwtUtil.extractUserId("Bearer testToken")).thenReturn(userId.toString());
+        when(transactionRepository.findByFromUserIdOrToUserIdOrderByTimestampDesc(eq(userId), eq(userId), any()))
+                .thenReturn(page);
+
+        mockMvc.perform(get("/api/transactions/history")
+                .header("Authorization", "Bearer testToken"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].type").value("TRANSFER"));
+    }
+
+    @Test
+    void getMyTrueLedgerBalance_UsesJwtUserId() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(jwtUtil.extractUserId("Bearer testToken")).thenReturn(userId.toString());
+        when(ledgerEntryRepository.calculateBalance(userId)).thenReturn(new BigDecimal("250.00"));
+
+        mockMvc.perform(get("/api/transactions/ledger-balance")
+                .header("Authorization", "Bearer testToken"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ledgerBalance").value(250.00))
                 .andExpect(jsonPath("$.userId").value(userId.toString()));
     }
 }

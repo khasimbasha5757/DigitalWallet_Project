@@ -3,6 +3,7 @@ package com.wallet.admin.controller;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +39,8 @@ public class AdminController {
 
     private static final Pattern EMAIL_PATTERN =
             Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+    private static final Pattern REWARD_POINTS_PATTERN =
+            Pattern.compile("(\\d+)\\s*(?:reward\\s*)?points?", Pattern.CASE_INSENSITIVE);
 
     @Autowired
     private CampaignRepository campaignRepository;
@@ -61,6 +64,7 @@ public class AdminController {
 
     @PostMapping("/campaigns")
     public ResponseEntity<Campaign> createCampaign(@jakarta.validation.Valid @RequestBody Campaign campaign) {
+        normalizeCampaign(campaign);
         return ResponseEntity.ok(campaignRepository.save(campaign));
     }
 
@@ -71,8 +75,13 @@ public class AdminController {
 
     @PostMapping("/kyc/{userId}/approve")
     public ResponseEntity<?> approveKyc(@PathVariable UUID userId,
+            @RequestParam(defaultValue = "false") boolean documentReviewed,
             @Parameter(hidden = true) @RequestHeader("Authorization") String token) {
         try {
+            if (!documentReviewed) {
+                return ResponseEntity.badRequest().body("Admin must review the submitted PDF before approval");
+            }
+
             // Admin-service orchestrates approval, but the KYC record itself lives in user-service.
             String userServiceUrl = gatewayBaseUrl + "/api/users/internal/kyc/" + userId + "/approve";
             HttpHeaders headers = new HttpHeaders();
@@ -200,5 +209,36 @@ public class AdminController {
 
     private boolean isValidEmail(String email) {
         return email != null && EMAIL_PATTERN.matcher(email.trim()).matches();
+    }
+
+    private void normalizeCampaign(Campaign campaign) {
+        if (campaign.getTargetTier() == null || campaign.getTargetTier().isBlank()) {
+            campaign.setTargetTier("ALL");
+        }
+        if (campaign.getStatus() == null || campaign.getStatus().isBlank()) {
+            campaign.setStatus("ACTIVE");
+        }
+        if (campaign.getTriggerEvent() == null || campaign.getTriggerEvent().isBlank()) {
+            campaign.setTriggerEvent(inferTriggerEvent(campaign.getName()));
+        }
+        if (campaign.getRewardPoints() == null || campaign.getRewardPoints() <= 0) {
+            campaign.setRewardPoints(extractRewardPoints(campaign.getName()));
+        }
+    }
+
+    private String inferTriggerEvent(String name) {
+        String normalizedName = name != null ? name.toLowerCase() : "";
+        if (normalizedName.contains("first")) {
+            return "FIRST_TRANSACTION";
+        }
+        return "EVERY_TRANSACTION";
+    }
+
+    private int extractRewardPoints(String name) {
+        Matcher matcher = REWARD_POINTS_PATTERN.matcher(name != null ? name : "");
+        if (!matcher.find()) {
+            return 0;
+        }
+        return Integer.parseInt(matcher.group(1));
     }
 }

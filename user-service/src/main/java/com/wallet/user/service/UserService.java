@@ -8,13 +8,19 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @Service
 public class UserService {
+
+    private static final String PDF_CONTENT_TYPE_PREFIX = "data:application/pdf";
 
     @Autowired
     private KycRepository kycRepository;
@@ -28,13 +34,54 @@ public class UserService {
     @Value("${gateway.base-url:http://localhost:8090}")
     private String gatewayBaseUrl;
 
+    @Value("${kyc.upload-dir:uploads/kyc}")
+    private String kycUploadDir;
+
+    @Value("${user.public-base-url:http://localhost:8082}")
+    private String userPublicBaseUrl;
+
     public Optional<com.wallet.user.entity.User> findById(UUID userId) {
         return userRepository.findById(userId);
+    }
+
+    public KycSubmitRequest buildKycRequest(String documentType, String documentNumber, MultipartFile documentFile) {
+        if (documentType == null || documentType.isBlank()) {
+            throw new RuntimeException("Document type is required");
+        }
+        if (documentNumber == null || documentNumber.isBlank()) {
+            throw new RuntimeException("Document number is required");
+        }
+        if (documentFile == null || documentFile.isEmpty()) {
+            throw new RuntimeException("PDF document is required");
+        }
+
+        String originalFilename = Optional.ofNullable(documentFile.getOriginalFilename()).orElse("");
+        boolean isPdf = "application/pdf".equalsIgnoreCase(documentFile.getContentType())
+                || originalFilename.toLowerCase().endsWith(".pdf");
+        if (!isPdf) {
+            throw new RuntimeException("KYC document must be submitted as a PDF file");
+        }
+
+        try {
+            Path uploadRoot = Path.of(kycUploadDir).toAbsolutePath().normalize();
+            Files.createDirectories(uploadRoot);
+            String storedFilename = UUID.randomUUID() + ".pdf";
+            Path targetFile = uploadRoot.resolve(storedFilename).normalize();
+            if (!targetFile.startsWith(uploadRoot)) {
+                throw new RuntimeException("Invalid PDF file");
+            }
+            documentFile.transferTo(targetFile);
+            String documentUrl = userPublicBaseUrl.replaceAll("/$", "") + "/api/users/kyc/documents/" + storedFilename;
+            return new KycSubmitRequest(documentType.trim(), documentNumber.trim(), documentUrl);
+        } catch (IOException e) {
+            throw new RuntimeException("Could not save PDF document");
+        }
     }
 
     @Transactional
     public String submitKyc(UUID userId, String email, String role, KycSubmitRequest request) {
         System.out.println("DEBUG: SubmitKYC called for UserID: " + userId + ", Email: " + email);
+        validatePdfDocument(request.getDocumentUrl());
         
         Optional<KycDetails> existingKyc = kycRepository.findByUserId(userId);
         if (existingKyc.isPresent() && existingKyc.get().getStatus().equals("APPROVED")) {
@@ -69,6 +116,10 @@ public class UserService {
         KycDetails kyc = kycRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("KYC submission not found for ID: " + userId));
 
+        if ("APPROVED".equals(status)) {
+            validatePdfDocument(kyc.getDocumentUrl());
+        }
+
         if (kyc.getEmail() == null || kyc.getEmail().isBlank()) {
             userRepository.findById(userId).ifPresent(user -> kyc.setEmail(user.getEmail()));
         }
@@ -99,5 +150,18 @@ public class UserService {
         }
 
         return kyc; // Return the full object including email
+    }
+
+    private void validatePdfDocument(String documentUrl) {
+        String normalizedUrl = documentUrl == null ? "" : documentUrl.trim().toLowerCase();
+        if (normalizedUrl.isBlank()) {
+            throw new RuntimeException("KYC document PDF is required");
+        }
+
+        boolean isPdf = normalizedUrl.startsWith(PDF_CONTENT_TYPE_PREFIX)
+                || normalizedUrl.matches("^https?://.+\\.pdf($|[?#].*)");
+        if (!isPdf) {
+            throw new RuntimeException("KYC document must be submitted as a PDF file");
+        }
     }
 }

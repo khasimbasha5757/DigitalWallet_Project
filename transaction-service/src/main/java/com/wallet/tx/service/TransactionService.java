@@ -57,6 +57,7 @@ public class TransactionService {
         BigDecimal amount = new BigDecimal(event.get("amount").toString());
         UUID txId = UUID.fromString(event.get("transactionId").toString());
         String method = event.get("paymentMethod") != null ? event.get("paymentMethod").toString() : "unknown";
+        String notes = event.get("notes") != null ? event.get("notes").toString() : "Topup via " + method;
 
         if (transactionRepository.existsById(txId)) {
             log.info("Skipping duplicate top-up transaction {}", txId);
@@ -69,7 +70,7 @@ public class TransactionService {
         tx.setAmount(amount);
         tx.setType("TOPUP");
         tx.setStatus("COMPLETED");
-        tx.setReferenceNotes("Topup via " + method);
+        tx.setReferenceNotes(notes);
         transactionRepository.saveAndFlush(tx);
 
         LedgerEntry credit = new LedgerEntry();
@@ -77,7 +78,7 @@ public class TransactionService {
         credit.setTransactionId(txId);
         credit.setType("CREDIT");
         credit.setAmount(amount);
-        credit.setDescription("Wallet Top-up");
+        credit.setDescription(notes);
         ledgerEntryRepository.saveAndFlush(credit);
 
         log.info("Successfully processed top-up for user: {}", userId);

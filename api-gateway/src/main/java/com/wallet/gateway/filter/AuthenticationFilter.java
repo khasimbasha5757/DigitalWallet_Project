@@ -68,6 +68,7 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
     public static class Config {
         public boolean isAuthRequired(String path) {
             boolean required = !path.contains("/api/auth/signup") && !path.contains("/api/auth/login")
+                && !path.contains("/api/auth/forgot-password/")
                 && !path.contains("/v3/api-docs") && !path.contains("/swagger-ui") 
                 && !path.contains("/webjars") && !path.contains("/actuator");
             return required;

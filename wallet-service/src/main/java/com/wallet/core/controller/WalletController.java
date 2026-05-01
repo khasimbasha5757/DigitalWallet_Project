@@ -27,8 +27,12 @@ public class WalletController {
     public ResponseEntity<Map<String, Object>> getBalance(@Parameter(hidden = true) @RequestHeader("Authorization") String token) {
         // The authenticated userId comes from JWT claims, not from request parameters.
         String userId = jwtUtil.extractUserId(token);
-        BigDecimal balance = walletService.getBalance(UUID.fromString(userId));
-        return ResponseEntity.ok(Map.of("userId", userId, "balance", balance));
+        try {
+            BigDecimal balance = walletService.getBalance(UUID.fromString(userId), token);
+            return ResponseEntity.ok(Map.of("userId", userId, "balance", balance));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 
     @PostMapping("/topup")
@@ -36,7 +40,7 @@ public class WalletController {
                                            @jakarta.validation.Valid @RequestBody TopUpRequest request) {
         String userId = jwtUtil.extractUserId(token);
         try {
-            return ResponseEntity.ok(walletService.topUp(UUID.fromString(userId), request));
+            return ResponseEntity.ok(walletService.topUp(UUID.fromString(userId), request, token));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
@@ -47,7 +51,19 @@ public class WalletController {
                                            @jakarta.validation.Valid @RequestBody TransferRequest request) {
         String userId = jwtUtil.extractUserId(token);
         try {
-            return ResponseEntity.ok(walletService.transfer(UUID.fromString(userId), request));
+            return ResponseEntity.ok(walletService.transfer(UUID.fromString(userId), request, token));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/internal/reward-credit")
+    public ResponseEntity<?> creditRewardCashback(@RequestBody Map<String, Object> request) {
+        try {
+            UUID userId = UUID.fromString(request.get("userId").toString());
+            BigDecimal amount = new BigDecimal(request.get("amount").toString());
+            String rewardName = request.get("rewardName") != null ? request.get("rewardName").toString() : "Reward cashback";
+            return ResponseEntity.ok(walletService.creditRewardCashback(userId, amount, rewardName));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }

@@ -34,7 +34,7 @@ public class NotificationControllerTest {
         history.setUserId(UUID.randomUUID());
         history.setMessage("Test Message");
 
-        when(repository.findAll()).thenReturn(List.of(history));
+        when(repository.findAllByOrderBySentAtDesc()).thenReturn(List.of(history));
 
         mockMvc.perform(get("/api/notifications"))
                 .andExpect(status().isOk())

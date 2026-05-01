@@ -94,4 +94,22 @@ public class RewardsControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string("Insufficient points"));
     }
+
+    @Test
+    void createCatalogItem_Success() throws Exception {
+        RewardCatalog item = new RewardCatalog();
+        item.setName("Headphones");
+        item.setDescription("Wireless over-ear headphones");
+        item.setCostInPoints(200);
+        item.setStockQuantity(5);
+        item.setRequiredTier("ALL");
+
+        when(rewardsService.createCatalogItem(any(RewardCatalog.class))).thenReturn(item);
+
+        mockMvc.perform(post("/api/rewards/catalog")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(item)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Headphones"));
+    }
 }

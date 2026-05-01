@@ -16,11 +16,20 @@ COPY transaction-service/pom.xml transaction-service/pom.xml
 COPY user-service/pom.xml user-service/pom.xml
 COPY wallet-service/pom.xml wallet-service/pom.xml
 
-RUN mvn -pl ${SERVICE_MODULE} -am dependency:go-offline
-
 COPY . .
 
-RUN mvn -pl ${SERVICE_MODULE} -am clean package -DskipTests && \
+RUN success=0; \
+    for i in 1 2 3; do \
+      if mvn -B -Dmaven.wagon.http.retryHandler.count=5 -Dmaven.artifact.threads=10 -pl ${SERVICE_MODULE} -am clean package -DskipTests; then \
+        success=1; \
+        break; \
+      fi; \
+      echo "package build failed on attempt $i, retrying..."; \
+      sleep 10; \
+    done; \
+    if [ "$success" -ne 1 ]; then \
+      exit 1; \
+    fi; \
     find "/app/${SERVICE_MODULE}/target" -maxdepth 1 -type f -name "*.jar" ! -name "*.jar.original" -exec cp {} /app/app.jar \;
 
 FROM eclipse-temurin:17-jre
@@ -28,5 +37,6 @@ FROM eclipse-temurin:17-jre
 WORKDIR /app
 
 COPY --from=build /app/app.jar /app/app.jar
+COPY --from=build /app/config-repo /app/config-repo
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

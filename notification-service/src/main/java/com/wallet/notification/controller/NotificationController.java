@@ -17,6 +17,6 @@ public class NotificationController {
 
     @GetMapping
     public ResponseEntity<List<NotificationHistory>> getAll() {
-        return ResponseEntity.ok(repository.findAll()); // Simple admin view
+        return ResponseEntity.ok(repository.findAllByOrderBySentAtDesc());
     }
 }

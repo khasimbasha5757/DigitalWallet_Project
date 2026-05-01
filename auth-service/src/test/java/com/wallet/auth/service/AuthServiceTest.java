@@ -2,6 +2,7 @@ package com.wallet.auth.service;
 
 import com.wallet.auth.dto.AuthRequest;
 import com.wallet.auth.dto.AuthResponse;
+import com.wallet.auth.dto.ChangePasswordRequest;
 import com.wallet.auth.dto.RegisterRequest;
 import com.wallet.auth.entity.UserCredential;
 import com.wallet.auth.repository.UserCredentialRepository;
@@ -80,9 +81,25 @@ public class AuthServiceTest {
     }
 
     @Test
+    void login_Success_WithEmailAndTrimmedUsername() {
+        AuthRequest authRequest = new AuthRequest(" test@example.com ", "password");
+        when(repository.findByUsernameIgnoreCase("test@example.com")).thenReturn(Optional.empty());
+        when(repository.findByEmailIgnoreCase("test@example.com")).thenReturn(Optional.of(userCredential));
+        when(passwordEncoder.matches("password", "encodedPassword")).thenReturn(true);
+        when(jwtUtil.generateToken(anyString(), anyString(), anyString(), anyString(), anyString())).thenReturn("testToken");
+
+        AuthResponse response = authService.login(authRequest);
+
+        assertNotNull(response);
+        assertEquals("testToken", response.getToken());
+        assertEquals(userCredential.getEmail(), response.getEmail());
+    }
+
+    @Test
     void login_InvalidCredentials_UserNotFound() {
         AuthRequest authRequest = new AuthRequest("testuser", "password");
         when(repository.findByUsernameIgnoreCase(anyString())).thenReturn(Optional.empty());
+        when(repository.findByEmailIgnoreCase(anyString())).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class, () -> authService.login(authRequest));
     }
@@ -113,5 +130,31 @@ public class AuthServiceTest {
         when(repository.findById(userId)).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class, () -> authService.getProfile(userId));
+    }
+
+    @Test
+    void changePassword_Success() {
+        UUID userId = userCredential.getId();
+        ChangePasswordRequest request = new ChangePasswordRequest("password", "newPassword");
+        when(repository.findById(userId)).thenReturn(Optional.of(userCredential));
+        when(passwordEncoder.matches("password", "encodedPassword")).thenReturn(true);
+        when(passwordEncoder.encode("newPassword")).thenReturn("newEncodedPassword");
+
+        String result = authService.changePassword(userId, request);
+
+        assertEquals("Password updated successfully.", result);
+        assertEquals("newEncodedPassword", userCredential.getPassword());
+        verify(repository).save(userCredential);
+    }
+
+    @Test
+    void changePassword_CurrentPasswordMismatch() {
+        UUID userId = userCredential.getId();
+        ChangePasswordRequest request = new ChangePasswordRequest("wrong", "newPassword");
+        when(repository.findById(userId)).thenReturn(Optional.of(userCredential));
+        when(passwordEncoder.matches("wrong", "encodedPassword")).thenReturn(false);
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> authService.changePassword(userId, request));
+        assertEquals("Current password is incorrect.", exception.getMessage());
     }
 }

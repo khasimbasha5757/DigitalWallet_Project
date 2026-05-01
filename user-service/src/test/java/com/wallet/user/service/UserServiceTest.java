@@ -44,7 +44,7 @@ public class UserServiceTest {
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
-        kycSubmitRequest = new KycSubmitRequest("PASSPORT", "ABC12345", "http://docs.com/123");
+        kycSubmitRequest = new KycSubmitRequest("PASSPORT", "ABC12345", "data:application/pdf;base64,JVBERi0x");
         kycDetails = new KycDetails();
         kycDetails.setUserId(userId);
         kycDetails.setStatus("PENDING");
@@ -69,6 +69,17 @@ public class UserServiceTest {
     }
 
     @Test
+    void submitKyc_RejectsNonPdfDocument() {
+        KycSubmitRequest nonPdfRequest = new KycSubmitRequest("PASSPORT", "ABC12345", "https://docs.com/123.png");
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> userService.submitKyc(userId, "test@example.com", "USER", nonPdfRequest));
+
+        assertEquals("KYC document must be submitted as a PDF file", exception.getMessage());
+        verify(kycRepository, never()).save(any(KycDetails.class));
+    }
+
+    @Test
     void getKycStatus_Success() {
         when(kycRepository.findByUserId(userId)).thenReturn(Optional.of(kycDetails));
 
@@ -90,6 +101,7 @@ public class UserServiceTest {
 
     @Test
     void updateKycStatus_Approved_Success() {
+        kycDetails.setDocumentUrl("https://docs.com/123.pdf");
         when(kycRepository.findByUserId(userId)).thenReturn(Optional.of(kycDetails));
 
         userService.updateKycStatus(userId, "APPROVED", null);
@@ -116,6 +128,7 @@ public class UserServiceTest {
         user.setId(userId);
         user.setEmail("registered@gmail.com");
         kycDetails.setEmail(" ");
+        kycDetails.setDocumentUrl("https://docs.com/123.pdf");
 
         when(kycRepository.findByUserId(userId)).thenReturn(Optional.of(kycDetails));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
